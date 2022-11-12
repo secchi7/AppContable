@@ -1,0 +1,1 @@
+Aplicación para poder registrar los consumos y los ahorros.
