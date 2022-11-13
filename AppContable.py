@@ -1,5 +1,4 @@
-from atexit import register
-from cgitb import text
+from datetime import datetime
 import os
 import os.path
 import sqlite3
@@ -17,7 +16,7 @@ class NuevoGasto(tk.Toplevel):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.config(width=300,height=300)
-        self.title("Nuevo Registro")
+        self.title("Nuevo Gasto")
 
         ######Llama al usuario
         f=open("usuario_actual.txt","r",encoding="utf8")
@@ -29,13 +28,13 @@ class NuevoGasto(tk.Toplevel):
             self,
             text="Tipo:"    
         )
-        self.etiqueta_tipo_movimiento.place(x=10,y=10)
-        self.lista_tipo_movimiento=ttk.Combobox(
-            self,
-            state="readonly",
-            values=["Ahorro","Gasto","Ingreso"]
-        )
-        self.lista_tipo_movimiento.place(x=150,y=10)
+        # self.etiqueta_tipo_movimiento.place(x=10,y=10)
+        # self.lista_tipo_movimiento=ttk.Combobox(
+        #     self,
+        #     state="readonly",
+        #     values=["Ahorro","Gasto","Ingreso"]
+        # )
+        # self.lista_tipo_movimiento.place(x=150,y=10)
 
         ######CATEGORÍA
         self.etiqueta_categoria=ttk.Label(
@@ -128,13 +127,16 @@ class NuevoGasto(tk.Toplevel):
 
     def agregar_nuevo_gasto(self):
         
-        tipo=self.lista_tipo_movimiento.get()
+        # tipo=self.lista_tipo_movimiento.get()
+        tipo="Gasto"
         categoria=self.lista_categoria.get()
         descripcion=self.verificar_vacio(self.caja_descripcion_gasto.get())
-        importe=self.verificar_vacio(self.caja_nuevo_gasto.get())
+        importe=float(self.verificar_vacio(self.caja_nuevo_gasto.get()))
         forma_pago=self.lista_forma_pago.get()
-        cuotas=self.lista_cantidad_cuotas.get()
-        fecha_gasto=self.caja_fecha_gasto.get()
+        cuotas=int(self.lista_cantidad_cuotas.get())
+        fecha_gasto=self.verificar_fecha(self.caja_fecha_gasto.get())
+
+        importe_cuotas=round(importe/cuotas,0)
 
         self.caja_descripcion_gasto.delete(0,tk.END)
         self.caja_nuevo_gasto.delete(0,tk.END)
@@ -145,7 +147,6 @@ class NuevoGasto(tk.Toplevel):
 
         else:
             cuota=0
-            cuotas=int(cuotas)
             año_1=int(fecha_gasto[0:1])
             año_2=int(fecha_gasto[1:2])
             año_3=int(fecha_gasto[2:3])
@@ -208,7 +209,7 @@ class NuevoGasto(tk.Toplevel):
 
                 conn=sqlite3.connect(f'{self.usuario_actual}.db')
                 cursor=conn.cursor()
-                cursor.execute("INSERT INTO gastos VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (tipo, categoria, descripcion, importe,forma_pago,cuota,cuotas,fecha_gasto))
+                cursor.execute("INSERT INTO gastos VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (tipo, categoria, descripcion, importe_cuotas,forma_pago,cuota,cuotas,fecha_gasto))
                 conn.commit()
                 conn.close()
 
@@ -225,6 +226,20 @@ class NuevoGasto(tk.Toplevel):
             else:
                 chequeo.append(letra.isdecimal())
         return all(chequeo)
+
+
+    def verificar_fecha(self,fecha):
+        fecha_verificar=fecha
+        try:
+            datetime.strptime(fecha_verificar, '%Y-%m-%d')
+        except ValueError:
+            messagebox.showwarning(
+            title="Advertencia",
+            message="Por favor ingrese una fecha correcta del tipo 'aaaa-mm-dd'"
+        )
+        else:
+            return fecha_verificar
+
 
     def verificar_vacio(self,dato):
         dato_verificar=dato
@@ -725,7 +740,7 @@ class VentanaPrincipal(tk.Tk):
 
         self.boton_nuevo_gasto=ttk.Button(
             self,
-            text="Nuevo Registro",
+            text="Nuevo Gasto",
             command=self.abrir_nuevo_gasto
             )
         self.boton_nuevo_gasto.place(x=390,y=45,width=110, height=25)
