@@ -3,6 +3,7 @@ import os
 import os.path
 import sqlite3
 import tkinter as tk
+import requests
 from tkinter import ttk,messagebox
 from base64 import b64decode
 
@@ -67,7 +68,7 @@ class NuevoGasto(tk.Toplevel):
         self.caja_nuevo_gasto=ttk.Entry(
             self,
             validate="key",
-            validatecommand=(self.register(self.validar_entrda_numeros), "%S")
+            validatecommand=(self.register(self.validar_entrada_numeros), "%S")
         )
         self.caja_nuevo_gasto.place(x=150,y=100,width=142,height=20)
 
@@ -131,89 +132,94 @@ class NuevoGasto(tk.Toplevel):
         tipo="Gasto"
         categoria=self.lista_categoria.get()
         descripcion=self.verificar_vacio(self.caja_descripcion_gasto.get())
-        importe=float(self.verificar_vacio(self.caja_nuevo_gasto.get()))
-        forma_pago=self.lista_forma_pago.get()
-        cuotas=int(self.lista_cantidad_cuotas.get())
-        fecha_gasto=self.verificar_fecha(self.caja_fecha_gasto.get())
+        if descripcion!=False:
 
-        importe_cuotas=round(importe/cuotas,0)
+            importe=float(self.verificar_vacio(self.caja_nuevo_gasto.get()))
+            if importe!=False:
+                forma_pago=self.lista_forma_pago.get()
+                cuotas=int(self.lista_cantidad_cuotas.get())
+                fecha_gasto=self.verificar_fecha(self.caja_fecha_gasto.get())
+                if fecha_gasto!=None:
 
-        self.caja_descripcion_gasto.delete(0,tk.END)
-        self.caja_nuevo_gasto.delete(0,tk.END)
-        # self.lista_tipo_gasto.delete(0,tk.END) ESTO NO FUNCIONA BUSCAR SOLUCIÓN
-        self.caja_fecha_gasto.delete(0,tk.END)
-        if descripcion==False or importe==False or fecha_gasto==None:
-            pass
+                    importe_cuotas=round(importe/cuotas,0)
 
-        else:
-            cuota=0
-            año_1=int(fecha_gasto[0:1])
-            año_2=int(fecha_gasto[1:2])
-            año_3=int(fecha_gasto[2:3])
-            año_4=int(fecha_gasto[3:4])
+                    self.caja_descripcion_gasto.delete(0,tk.END)
+                    self.caja_nuevo_gasto.delete(0,tk.END)
+                    # self.lista_tipo_gasto.delete(0,tk.END) ESTO NO FUNCIONA BUSCAR SOLUCIÓN
+                    self.caja_fecha_gasto.delete(0,tk.END)
 
-            mes_1=int(fecha_gasto[5:6])
-            mes_2=int(fecha_gasto[6:7])
+        # if descripcion==False or importe==False or fecha_gasto==None:
+        #     pass
 
-            dia=fecha_gasto[8:10]
+        # else:
+                    cuota=0
+                    año_1=int(fecha_gasto[0:1])
+                    año_2=int(fecha_gasto[1:2])
+                    año_3=int(fecha_gasto[2:3])
+                    año_4=int(fecha_gasto[3:4])
 
-            while cuota < cuotas:
-                cuota+=1
-                if mes_1==0 and mes_2<9:
-                    fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
-                    mes_2=mes_2+1
+                    mes_1=int(fecha_gasto[5:6])
+                    mes_2=int(fecha_gasto[6:7])
 
-                elif mes_1==0 and mes_2==9:
-                    fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
-                    mes_1=1
-                    mes_2=0
-                    
-                
-                elif mes_1==1 and mes_2<2:
-                    fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
-                    mes_2=mes_2+1
-                    
-                
-                elif mes_1==1 and mes_2==2:
-                    if año_4<9:
-                        fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
-                        año_4=año_4+1
-                        mes_1=0
-                        mes_2=1
-                              
+                    dia=fecha_gasto[8:10]
 
-                    elif año_3<9:
-                        fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
-                        año_3=año_3+1
-                        año_4=0
-                        mes_1=0
-                        mes_2=1
+                    while cuota < cuotas:
+                        cuota+=1
+                        if mes_1==0 and mes_2<9:
+                            fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
+                            mes_2=mes_2+1
+
+                        elif mes_1==0 and mes_2==9:
+                            fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
+                            mes_1=1
+                            mes_2=0
+                            
                         
-                    elif año_2<9:
-                        fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
-                        año_2=año_2+1
-                        año_3=0
-                        año_4=0
-                        mes_1=0
-                        mes_2=1
+                        elif mes_1==1 and mes_2<2:
+                            fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
+                            mes_2=mes_2+1
+                            
                         
-                    elif año_1<9:
-                        fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
-                        año_1=año_1+1
-                        año_2=0
-                        año_3=0
-                        año_4=0
-                        mes_1=0
-                        mes_2=1
-                        
+                        elif mes_1==1 and mes_2==2:
+                            if año_4<9:
+                                fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
+                                año_4=año_4+1
+                                mes_1=0
+                                mes_2=1
+                                    
 
-                conn=sqlite3.connect(f'{self.usuario_actual}.db')
-                cursor=conn.cursor()
-                cursor.execute("INSERT INTO gastos VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (tipo, categoria, descripcion, importe_cuotas,forma_pago,cuota,cuotas,fecha_gasto))
-                conn.commit()
-                conn.close()
+                            elif año_3<9:
+                                fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
+                                año_3=año_3+1
+                                año_4=0
+                                mes_1=0
+                                mes_2=1
+                                
+                            elif año_2<9:
+                                fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
+                                año_2=año_2+1
+                                año_3=0
+                                año_4=0
+                                mes_1=0
+                                mes_2=1
+                                
+                            elif año_1<9:
+                                fecha_gasto=(f'{año_1}{año_2}{año_3}{año_4}-{mes_1}{mes_2}-{dia}')
+                                año_1=año_1+1
+                                año_2=0
+                                año_3=0
+                                año_4=0
+                                mes_1=0
+                                mes_2=1
+                                
 
-    def validar_entrda_numeros(self,texto):
+                        conn=sqlite3.connect(f'{self.usuario_actual}.db')
+                        cursor=conn.cursor()
+                        cursor.execute("INSERT INTO gastos VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (tipo, categoria, descripcion, importe_cuotas,forma_pago,cuota,cuotas,fecha_gasto))
+                        conn.commit()
+                        conn.close()
+
+    def validar_entrada_numeros(self,texto):
         return texto.isdecimal()
 
     def validar_fecha(self,fecha):
@@ -297,14 +303,16 @@ class VentanaAhorros(tk.Toplevel):
         cursor.execute(f"SELECT tipo, especie, cantidad FROM ahorros ORDER BY especie")
         ahorros=cursor.fetchall()
         self.tabla_gasto.delete(*self.tabla_gasto.get_children())
+
+        precio_dolar=self.dolar()
         for ahorro in ahorros:
             
             tipo=ahorro[0]
             especie=ahorro[1]
             cantidad=ahorro[2]
-            cotización=0
-            precio_p=0
-            precio_d=0
+            cotización=self.api_iol(especie)
+            precio_p=cantidad*cotización
+            precio_d=cantidad*precio_dolar
 
             self.tabla_gasto.insert("",tk.END,values=(tipo, especie, cantidad, cotización,precio_p,precio_d))
 
@@ -317,6 +325,145 @@ class VentanaAhorros(tk.Toplevel):
         self.boton_cerrar.place(x=400,y=770)
         # Indicar que está en uso luego de crearse
         self.__class__.en_uso=True
+
+    def dolar(self):
+        r = requests.get("https://api-dolar-argentina.herokuapp.com/api/contadoliqui")
+
+        if r.status_code==200:
+            print("Petición exitosa.")
+            contenido=r.json()
+            dolar_CCL=float(contenido["compra"])
+            return dolar_CCL
+
+        else:
+            print(r.status_code)
+            dolar_CCL=0
+            return dolar_CCL
+
+
+    def api_iol(self,especie):
+        #################### SECCION POST ####################
+
+        # Pido la fecha actual para compararla con la fecha del Token_Bearer
+        fecha_actual=datetime.now().replace(microsecond=0)
+
+        f=open("Token_Bearer.txt","r",encoding="utf8")
+        contenido=f.read().split("\n")
+        fecha=contenido[1]
+        f.close()
+
+        fecha_formato=datetime.strptime(fecha, '%Y-%m-%d %H:%M:%S')
+
+        minutos_diferencia= (fecha_actual-fecha_formato).total_seconds()/60
+
+        if minutos_diferencia<15:
+            # "Estamos en tiempo menor a 15min, no hace falta renovar el token"
+            f=open("Token_Bearer.txt","r",encoding="utf8")
+            contenido=f.read().split("\n")
+            Token_Bearer=contenido[0]
+            f.close()
+
+        elif minutos_diferencia<60 and minutos_diferencia>15:
+            # "Estamos entre los 15 min y la 60 min de cuanto se solicito el token, es necesario usar el refresh"
+
+            # Abro el txt para obtener el Token_Refresh
+            url="https://api.invertironline.com/token"
+            f=open("Token_Refresh.txt", "r", encoding="utf8")
+            contenido=f.read().split("\n")
+            Token_Refresh=contenido[0]
+            f.close()
+
+            #Abro el Token_Bearer para obtener la feche original y mantenerla en el txt, ya que tiene vigencia por 60min 
+            f=open("Token_Refresh.txt", "r", encoding="utf8")
+            contenido=f.read().split("\n")
+            fecha_Bearer=contenido[1]
+            f.close()
+
+            datos={
+                "refresh_token":Token_Refresh,
+                "grant_type":'refresh_token'
+            }
+
+            r = requests.post(url,data=datos)
+
+            if r.status_code==200:
+                token=r.json()
+                fecha=str(datetime.now().replace(microsecond=0))
+
+                f=open("Token_Bearer.txt","w",encoding="utf8")
+                f.write(token['access_token']+"\n")
+                f.write(fecha_Bearer)
+                f.close()
+
+                f=open("Token_Refresh.txt","w",encoding="utf8")
+                f.write(token['refresh_token']+"\n")
+                f.write(fecha)
+                f.close()
+
+            else:
+                print("Error de petición.")
+                print(r.status_code)
+
+        else:
+            # "Se necesita volver a pedir el Token_Bearer"
+            url="https://api.invertironline.com/token"
+
+            f=open("User_Password.txt", "r", encoding="utf8")
+            contenido=f.read().split("\n")
+            user=contenido[0]
+            password=contenido[1]
+            f.close()
+
+            datos={
+                "username":user,
+                "password":password,
+                "grant_type":'password'
+            }
+
+            r = requests.post(url,data=datos)
+
+            if r.status_code==200:
+                token=r.json()
+                fecha=str(datetime.now().replace(microsecond=0))
+
+                f=open("Token_Bearer.txt","w",encoding="utf8")
+                f.write(token['access_token']+"\n")
+                f.write(fecha)
+                f.close()
+
+                f=open("Token_Refresh.txt","w",encoding="utf8")
+                f.write(token['refresh_token']+"\n")
+                f.write(fecha)
+                f.close()
+
+            else:
+                print("Error de petición.")
+                print(r.status_code)
+
+        #################### SECCION GET ####################
+
+        f=open("Token_Bearer.txt", "r", encoding="utf8")
+        contenido=f.read().split("\n")
+        Token_Bearer=contenido[0]
+        f.close()
+
+        mercado="bCBA"
+        simbolo=str(especie)
+
+        datos={"Authorization": "Bearer "+Token_Bearer}
+
+        r = requests.get(url=f"https://api.invertironline.com/api/v2/{mercado}/Titulos/{simbolo}/CotizacionDetalle", headers=datos)
+
+        if r.status_code==200:
+            titulo=r.json()
+            precio_especie=titulo["ultimoPrecio"]
+            return  precio_especie
+
+        else:
+            print("Error de petición.")
+            print(r.status_code)
+
+        print("Fin del programa.")        
 
     def destroy(self):
         self.__class__.en_uso=False
@@ -523,7 +670,7 @@ class NuevoAhorro(tk.Toplevel):
         self.caja_cantidad=ttk.Entry(
             self,
             validate="key",
-            validatecommand=(self.register(self.validar_entrda_numeros), "%S")
+            validatecommand=(self.register(self.validar_entrada_numeros), "%S")
             )
         self.caja_cantidad.place(x=150,y=70,width=142 ,height=20)        
 
@@ -579,7 +726,7 @@ class NuevoAhorro(tk.Toplevel):
             conn.commit()
             conn.close()
 
-    def validar_entrda_numeros(self,texto):
+    def validar_entrada_numeros(self,texto):
         return texto.isdecimal()
 
     def validar_fecha(self,fecha):
@@ -692,7 +839,7 @@ class GastosMensuales(tk.Toplevel):
         
         cursor=conn.cursor()
         cursor.execute(f"SELECT descripcion, importe, formadepago, cuota, cantidadCuotas, fecha FROM gastos WHERE tipo='Gasto' AND strftime('%m', fecha)='{mes_mostrar}' ORDER BY fecha")
-        gastos_mensuales=cursor.fetchall()
+        gastos_mensuales=cursor.fetchall()      
         self.tabla_gasto.delete(*self.tabla_gasto.get_children())
         for gasto in gastos_mensuales:
             
@@ -704,10 +851,15 @@ class GastosMensuales(tk.Toplevel):
             fecha=gasto[5]
             self.tabla_gasto.insert("",tk.END,values=(descripcion, importe, formadepago, cuota, cuotas, fecha))
 
+        conn.close()
+
     def validar_entrada_año(self,texto):
-        if len(texto)>4:
-            return False
-        return texto.isdecimal()
+        if texto=="":
+            return True
+        else:        
+            if len(texto)>4:
+                return False
+            return texto.isdecimal()
 
     def destroy(self):
         self.__class__.en_uso=False
