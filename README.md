@@ -1,1 +1,1 @@
-Aplicación para poder registrar los consumos y los ahorros.
+Aplicación para poder registrar los gastos mensuales, los ahorros e inversiones.
