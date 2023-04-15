@@ -11,6 +11,14 @@
 # Archivo que utilicé para poder incorporar el ícono al programa
 codificar_icono.py
 API_IOL_v1.0.py
+accionesLideres.py
+accionesLideresJson.py
+auxiliar_v2.0.py
+auxiliar.py
+cedear.py
+cedearJson.py
+Market.json
+panelGeneral.py
 
 ########TEMPLATE########
 

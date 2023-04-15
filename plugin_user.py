@@ -145,7 +145,7 @@ class NewUser(tk.Toplevel):
                 # silenciar la excepción
                 pass
             try:
-                cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, cantidad INT, fecha DATE)")
+                cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fecha DATE)")
             except sqlite3.OperationalError:
                 # silenciar la excepción
                 pass

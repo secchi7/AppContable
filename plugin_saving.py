@@ -5,6 +5,7 @@ import os.path
 import sqlite3
 import requests
 from datetime import datetime
+import json
 
 class NewSaving(tk.Toplevel):
     in_use=False
@@ -43,18 +44,32 @@ class NewSaving(tk.Toplevel):
             )
         self.box_name.place(x=150,y=40)
 
+        ######MERCADO
+        self.tag_market=ttk.Label(
+            self,
+            text="Mercado:"
+        )
+        self.tag_market.place(x=10,y=70)
+
+        self.list_market=ttk.Combobox(
+            self,
+            state="readonly",
+            values=["Lider","General", "Cedear", "Dolar", "Oro"]
+        )
+        self.list_market.place(x=150,y=70)
+
         ######CANTIDAD
         self.tag_amount=ttk.Label(
             self,
             text="Cantidad:"
         )
-        self.tag_amount.place(x=10,y=70)
+        self.tag_amount.place(x=10,y=100)
         self.box_amount=ttk.Entry(
             self,
             validate="key",
             validatecommand=(self.register(self.validate_entry_numeros), "%S")
             )
-        self.box_amount.place(x=150,y=70,width=142 ,height=20)        
+        self.box_amount.place(x=150,y=100,width=142 ,height=20)        
 
         ######FECHA
         self.tag_date_saving=ttk.Label(
@@ -86,8 +101,9 @@ class NewSaving(tk.Toplevel):
 
     def add_new_saving(self):
         
-        type=self.list_type_movimiento.get()
+        type_saving=self.list_type_movimiento.get()
         name=self.check_empty(self.box_name.get())
+        market=self.list_market.get()
         amount=self.check_empty(self.box_amount.get())
         # importe=self.verificar_vacio(self.caja_nuevo_gasto.get())
         # forma_pago=self.lista_forma_pago.get()
@@ -104,7 +120,7 @@ class NewSaving(tk.Toplevel):
         else:
             conn=sqlite3.connect(f'{self.user_current}.db')
             cursor=conn.cursor()
-            cursor.execute("INSERT INTO ahorros VALUES (?, ?, ?, ?)", (type, name, amount,date_saving))
+            cursor.execute("INSERT INTO ahorros VALUES (?, ?, ?, ?, ?)", (type_saving, name, market, amount,date_saving))
             conn.commit()
             conn.close()
 
@@ -175,21 +191,23 @@ class VindowSaving(tk.Toplevel):
         conn=sqlite3.connect(f'{user_current}.db')
         
         cursor=conn.cursor()
-        cursor.execute(f"SELECT tipo, especie, cantidad FROM ahorros ORDER BY especie")
+        cursor.execute(f"SELECT tipo, especie, mercado, SUM(cantidad) FROM ahorros GROUP BY especie")
         savings=cursor.fetchall()
-        self.table_saving.delete(*self.table_saving.get_children())
 
+        self.table_saving.delete(*self.table_saving.get_children())
         price_dollar=self.dollar()
+
         for saving in savings:
             
-            type=saving[0]
+            type_saving=saving[0]
             name=saving[1]
-            amount=saving[2]
-            quotation=self.api_iol(name)
-            price_q=amount*quotation
+            market=saving[2]
+            amount=saving[3]
+            price=float(self.api_bolsar(name,market))
+            price_q=amount*price
             price_d=amount*price_dollar
 
-            self.table_saving.insert("",tk.END,values=(type, name, amount, quotation,price_q,price_d))
+            self.table_saving.insert("",tk.END,values=(type_saving, name, amount, price,price_q,price_d))
 
         self.btn_close=ttk.Button(
             self,
@@ -213,132 +231,86 @@ class VindowSaving(tk.Toplevel):
         else:
             print(r.status_code)
             dollar_CCL=0
-            return dollar_CCL
+            return dollar_CCL    
+
+    def api_bolsar(self,name,market):
+        name=name.upper()
+        name=f"{name}_48hs"
+        payload = ""
+        headers = {
+            "authority": "ws.bolsar.info",
+            "accept": "application/json, text/javascript, */*; q=0.01",
+            "accept-language": "es-ES,es;q=0.9",
+            "origin": "https://bolsar.info",
+            "referer": "https://bolsar.info/",
+            "sec-ch-ua": "^\^Chromium^^;v=^\^112^^, ^\^Google",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "^\^Windows^^",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-site",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
+        }
+
+        if market=="Lider":
+            # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
+            # querystring = {"1":"1"}
+            # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+
+            # jsondata=json.loads(response.text)
+            with open('Market.json') as f:
+                jsondata=json.load(f)
 
 
-    def api_iol(self,name):
-        #################### SECCION POST ####################
+            # creo un diccionario para buscar el código
+            accionesLideres={}
+            codes=jsondata.keys()  #creo una lista con las keys del diccionario
 
-        # Pido la fecha actual para compararla con la fecha del Token_Bearer
-        date_current=datetime.now().replace(microsecond=0)
+            for code in codes:
+                value=jsondata[code]["name"]
+                accionesLideres[value]=code
 
-        f=open("Token_Bearer.txt","r",encoding="utf8")
-        content=f.read().split("\n")
-        date=content[1]
-        f.close()
 
-        date_formato=datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
-
-        minutes_difference= (date_current-date_formato).total_seconds()/60
-
-        if minutes_difference<15:
-            # "Estamos en tiempo menor a 15min, no hace falta renovar el token"
-            f=open("Token_Bearer.txt","r",encoding="utf8")
-            content=f.read().split("\n")
-            Token_Bearer=content[0]
-            f.close()
-
-        elif minutes_difference<60 and minutes_difference>15:
-            # "Estamos entre los 15 min y la 60 min de cuanto se solicito el token, es necesario usar el refresh"
-
-            # Abro el txt para obtener el Token_Refresh
-            url="https://api.invertironline.com/token"
-            f=open("Token_Refresh.txt", "r", encoding="utf8")
-            content=f.read().split("\n")
-            Token_Refresh=content[0]
-            f.close()
-
-            #Abro el Token_Bearer para obtener la feche original y mantenerla en el txt, ya que tiene vigencia por 60min 
-            f=open("Token_Refresh.txt", "r", encoding="utf8")
-            content=f.read().split("\n")
-            date_Bearer=content[1]
-            f.close()
-
-            information={
-                "refresh_token":Token_Refresh,
-                "grant_type":'refresh_token'
-            }
-
-            r = requests.post(url,data=information)
-
-            if r.status_code==200:
-                token=r.json()
-                date=str(datetime.now().replace(microsecond=0))
-
-                f=open("Token_Bearer.txt","w",encoding="utf8")
-                f.write(token['access_token']+"\n")
-                f.write(date_Bearer)
-                f.close()
-
-                f=open("Token_Refresh.txt","w",encoding="utf8")
-                f.write(token['refresh_token']+"\n")
-                f.write(date)
-                f.close()
+            if name in accionesLideres.keys():
+                code=accionesLideres[name]
 
             else:
-                print("Error de petición.")
-                print(r.status_code)
+                print("ERROR")
+            
+            datos=jsondata[code]["description"]
+            datos=datos.strip()
+            lineas=datos.split("\n") 
 
-        else:
-            # "Se necesita volver a pedir el Token_Bearer"
-            url="https://api.invertironline.com/token"
-
-            f=open("User_Password.txt", "r", encoding="utf8")
-            content=f.read().split("\n")
-            user=content[0]
-            password=content[1]
-            f.close()
-
-            information={
-                "username":user,
-                "password":password,
-                "grant_type":'password'
-            }
-
-            r = requests.post(url,data=information)
-
-            if r.status_code==200:
-                token=r.json()
-                date=str(datetime.now().replace(microsecond=0))
-
-                f=open("Token_Bearer.txt","w",encoding="utf8")
-                f.write(token['access_token']+"\n")
-                f.write(date)
-                f.close()
-
-                f=open("Token_Refresh.txt","w",encoding="utf8")
-                f.write(token['refresh_token']+"\n")
-                f.write(date)
-                f.close()
-
-            else:
-                print("Error de petición.")
-                print(r.status_code)
-
-        #################### SECCION GET ####################
-
-        f=open("Token_Bearer.txt", "r", encoding="utf8")
-        content=f.read().split("\n")
-        Token_Bearer=content[0]
-        f.close()
-
-        market="bCBA"
-        symbol=str(name)
-
-        information={"Authorization": "Bearer "+Token_Bearer}
-
-        r = requests.get(url=f"https://api.invertironline.com/api/v2/{market}/Titulos/{symbol}/CotizacionDetalle", headers=information)
-
-        if r.status_code==200:
-            security =r.json()
-            price_name=security ["ultimoPrecio"]
+            for linea in lineas:
+                indice1=linea.find("<b>")
+                indice2=linea.find("</b>")
+                price_name=linea[indice1+3:indice2]
+            
+            price_name=float(price_name.replace(",", "." ))
             return  price_name
 
-        else:
-            print("Error de petición.")
-            print(r.status_code)
+        elif name=="Cedear":
+            print("cedear")
+            # code=cedears[name]
+            # url = "https://ws.bolsar.info/BYMA/paneles_v2.php"
+            # querystring = {"1":"1","panel":"5","format":"json"}
+            # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
 
-        print("Fin del programa.")        
+            # jsondata=json.loads(response.text)
+
+            # datos=jsondata[code]["description"]
+            # datos=datos.strip()
+            # lineas=datos.split("\n")
+
+            # for linea in lineas:
+            #     indice1=linea.find("<b>")
+            #     indice2=linea.find("</b>")
+            #     price_name=linea[indice1+3:indice2]
+                
+            # return  price_name
+
+        else:
+            print("ERROR")
 
     def destroy(self):
         self.__class__.in_use=False
