@@ -1,5 +1,6 @@
 import os
 import os.path
+import sqlite3
 import tkinter as tk
 from tkinter import ttk
 from base64 import b64decode
@@ -63,15 +64,11 @@ class MainWindow(tk.Tk):
         self.btn_new_saving.place(x=390,y=80,width=110, height=25)
 
         ###################VERIFICA SI EXISTE UN USUARIO###########
-        
-        if os.path.isfile("usuario_actual.txt")==True:
-
-            f=open("usuario_actual.txt","r",encoding="utf8")
-
-            user_current=str(f.read())
-                
-            f.close()
-
+        if os.path.isfile("main.db")==True:
+            conn=sqlite3.connect('main.db')
+            cursor=conn.cursor()
+            cursor.execute(f"SELECT nombre FROM usuarioActual")
+            user_current=cursor.fetchone()[0]
         else:
             user_current="No existe ningún usuario."
                 

@@ -24,11 +24,13 @@ class UserList(tk.Toplevel):
             text="Usuario existente"
         )
         self.tag_user_existing.place(x=10,y=10)
-        
-        if os.path.isfile("usuarios.txt")==True:
-            f=open("usuarios.txt","r",encoding="utf8")
-            users=f.read().split("\n")[:-1]
-            f.close()
+
+        if os.path.isfile("main.db")==True:
+            conn=sqlite3.connect('main.db')
+            cursor=conn.cursor()
+            cursor.execute(f"SELECT nombre FROM usuarios")
+            users=cursor.fetchall()
+            conn.close()
 
         else:
             users=[]
@@ -80,6 +82,7 @@ class NewUser(tk.Toplevel):
 
     def __init__(self,*args,callback=None,**kwargs):
         super().__init__(*args,**kwargs)
+        self.create_base_data()
         self.config(width=280,height=100)
 
         self.callback=callback
@@ -106,7 +109,7 @@ class NewUser(tk.Toplevel):
         self.btn_add_user=ttk.Button(
             self,
             text="Agregar usuario",
-            command=self.create_base_data
+            command=self.create_user
         )
         self.btn_add_user.place(x=10,y=70)
 
@@ -115,8 +118,41 @@ class NewUser(tk.Toplevel):
         # Indicar que está en uso luego de crearse
         self.__class__.in_use=True
 
-
     def create_base_data(self):
+        try:
+            conn=sqlite3.connect(f'main.db')
+        except sqlite3.OperationalError:
+            # silenciar la excepción
+            pass
+
+        cursor=conn.cursor()
+
+        try:
+            cursor.execute("CREATE TABLE usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT)")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cursor.execute("CREATE TABLE usuarioActual (nombre TEXT, usuarioId, FOREIGN KEY(usuarioId) REFERENCES usuarios(id))")
+        except sqlite3.OperationalError:
+            pass
+        
+        cursor.execute("INSERT INTO usuarioActual VALUES (?,?)", ["NULL","NUL"])
+
+        try:
+            cursor.execute("CREATE TABLE gastos (tipo TEXT, categoría TEXT, descripcion TEXT, importe FLOAT, formadepago TEXT, cuota INT, cantidadCuotas INT, fecha DATE)")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fecha DATE)")
+        except sqlite3.OperationalError:
+            pass
+        
+        conn.commit()
+        conn.close()
+
+    def create_user(self):
         user=self.box_new_user.get()
         if user.strip()=="":
             messagebox.showwarning(
@@ -125,33 +161,24 @@ class NewUser(tk.Toplevel):
             )
 
         else:
-            f=open("usuario_actual.txt","w",encoding="utf8")
-            f.write(user)
-            f.close()
-
-            f=open("usuarios.txt","a",encoding="utf8")
-            f.write(f'{user}\n')
-            f.close()
-       
-            conn=sqlite3.connect(f'{user}.db')
+            conn=sqlite3.connect('main.db')
             cursor=conn.cursor()
-            
+            cursor.execute(f"SELECT nombre FROM usuarios WHERE nombre=?",[f"{user}"])
+            consultation=cursor.fetchall()
             self.callback(self.box_new_user.get())
 
+            if consultation==[]:
+                cursor.execute("INSERT INTO usuarios(nombre) VALUES (?)", [f"{user}"])
+                cursor.execute("UPDATE usuarioActual SET nombre=?, usuarioId=?", (f"{user}",cursor.lastrowid))
+                conn.commit()
+                conn.close()
 
-            try:
-                cursor.execute("CREATE TABLE gastos (tipo TEXT, categoría TEXT, descripcion TEXT,importe FLOAT, formadepago TEXT, cuota INT, cantidadCuotas INT, fecha DATE)")
-            except sqlite3.OperationalError:
-                # silenciar la excepción
-                pass
-            try:
-                cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fecha DATE)")
-            except sqlite3.OperationalError:
-                # silenciar la excepción
-                pass
+            else:
+                messagebox.showwarning(
+                    title="Advertencia",
+                    message="El usuario ya existe."
+                )
 
-            conn.close()
-            
 
     def destroy(self):
         self.__class__.in_use=False
