@@ -14,9 +14,10 @@ class NewSpend(tk.Toplevel):
         self.title("Nuevo Gasto")
 
         ######Llama al usuario
-        f=open("usuario_actual.txt","r",encoding="utf8")
-        self.user_current=str(f.read())
-        f.close()
+        conn=sqlite3.connect('main.db')
+        cursor=conn.cursor()
+        cursor.execute(f"SELECT nombre FROM usuarioActual")
+        self.user_current=cursor.fetchone()[0]
 
         ######TIPO
         self.tag_type_movimiento=ttk.Label(
@@ -207,9 +208,11 @@ class NewSpend(tk.Toplevel):
                                 month_2=1
                                 
 
-                        conn=sqlite3.connect(f'{self.user_current}.db')
+                        conn=sqlite3.connect('main.db')
                         cursor=conn.cursor()
-                        cursor.execute("INSERT INTO gastos VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (type, category, overview, amount_installments,way_pay,installment,installments,date_spend))
+                        cursor.execute(f"SELECT id FROM usuarios WHERE nombre=?",[f"{self.user_current}"])
+                        id_user=cursor.fetchone()[0]
+                        cursor.execute("INSERT INTO gastos VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (type, category, overview, amount_installments,way_pay,installment,installments,date_spend, id_user))
                         conn.commit()
                         conn.close()
 
@@ -332,14 +335,16 @@ class SpendMonthly(tk.Toplevel):
         months={"Enero":"01","Febrero":"02","Marzo":"03","Abril":"04","Mayo":"05","Junio":"06","Julio":"07" ,"Agosto":"08" ,"Septiembre":"09" ,"Octubre":"10" ,"Noviembre":"11" ,"Diciembre":"12"}
         month_display=months[month]
 
-        f=open("usuario_actual.txt","r",encoding="utf8")
-        user_current=str(f.read())
-        f.close()
+        ######Llama al usuario
+        conn=sqlite3.connect('main.db')
+        cursor=conn.cursor()
+        cursor.execute(f"SELECT usuarioId FROM usuarioActual")
+        self.userId_current=cursor.fetchone()[0]
         
-        conn=sqlite3.connect(f'{user_current}.db')
+        conn=sqlite3.connect('main.db')
         
         cursor=conn.cursor()
-        cursor.execute(f"SELECT descripcion, importe, formadepago, cuota, cantidadCuotas, fecha FROM gastos WHERE tipo='Gasto' AND strftime('%m', fecha)='{month_display}' ORDER BY fecha")
+        cursor.execute(f"SELECT descripcion, importe, formadepago, cuota, cantidadCuotas, fecha FROM gastos WHERE usuarioId={self.userId_current} AND tipo='Gasto' AND strftime('%m', fecha)='{month_display}' ORDER BY fecha")
         spend_monthly=cursor.fetchall()      
         self.table_spend.delete(*self.table_spend.get_children())
         for spend in spend_monthly:

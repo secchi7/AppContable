@@ -60,18 +60,19 @@ class UserList(tk.Toplevel):
 
     def select_user(self):
         user_selected=self.list_users.get()
-        f=open("usuario_actual.txt","w",encoding="utf8")
-        f.write(user_selected)
-
-        f.close()
+        conn=sqlite3.connect('main.db')
+        cursor=conn.cursor()
+        cursor.execute(f"SELECT id FROM usuarios WHERE nombre=?",[f"{user_selected}"])
+        id_user=cursor.fetchone()[0]
+        cursor.execute("UPDATE usuarioActual SET nombre=?, usuarioId=?", (f"{user_selected}",id_user))
+        conn.commit()
+        conn.close()
 
         self.callback(self.list_users.get())
 
         # Una vez que se seleccionó el usuario, cierra la ventana.
         self.__class__.in_use=False
         return super().destroy()
-
-
      
     def destroy(self):
         self.__class__.in_use=False
@@ -140,12 +141,12 @@ class NewUser(tk.Toplevel):
         cursor.execute("INSERT INTO usuarioActual VALUES (?,?)", ["NULL","NUL"])
 
         try:
-            cursor.execute("CREATE TABLE gastos (tipo TEXT, categoría TEXT, descripcion TEXT, importe FLOAT, formadepago TEXT, cuota INT, cantidadCuotas INT, fecha DATE)")
+            cursor.execute("CREATE TABLE gastos (tipo TEXT, categoría TEXT, descripcion TEXT, importe FLOAT, formadepago TEXT, cuota INT, cantidadCuotas INT, fecha DATE, usuarioId, FOREIGN KEY(usuarioId) REFERENCES usuarioActual(usuarioId))")
         except sqlite3.OperationalError:
             pass
 
         try:
-            cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fecha DATE)")
+            cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fecha DATE, usuarioId, FOREIGN KEY(usuarioId) REFERENCES usuarioActual(usuarioId))")
         except sqlite3.OperationalError:
             pass
         
