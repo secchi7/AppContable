@@ -146,7 +146,7 @@ class NewUser(tk.Toplevel):
             pass
 
         try:
-            cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fecha DATE, usuarioId, FOREIGN KEY(usuarioId) REFERENCES usuarioActual(usuarioId))")
+            cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fechaCompra DATE, cotizacion FLOAT, cotizacionFecha DATE,usuarioId, FOREIGN KEY(usuarioId) REFERENCES usuarioActual(usuarioId))")
         except sqlite3.OperationalError:
             pass
         

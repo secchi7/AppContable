@@ -4,7 +4,7 @@ import os
 import os.path
 import sqlite3
 import requests
-from datetime import datetime
+from datetime import datetime, date
 import json
 
 class NewSaving(tk.Toplevel):
@@ -16,10 +16,11 @@ class NewSaving(tk.Toplevel):
         self.title("Ahorros")
 
         ######Llama al usuario
-        f=open("usuario_actual.txt","r",encoding="utf8")
-        self.user_current=str(f.read())
-        f.close()
-
+        conn=sqlite3.connect('main.db')
+        cursor=conn.cursor()
+        cursor.execute(f"SELECT nombre FROM usuarioActual")
+        self.user_current=cursor.fetchone()[0]
+        conn.close()
         ######TIPO
         self.tag_type_movimiento=ttk.Label(
             self,
@@ -118,9 +119,11 @@ class NewSaving(tk.Toplevel):
             pass
 
         else:
-            conn=sqlite3.connect(f'{self.user_current}.db')
+            conn=sqlite3.connect('main.db')
             cursor=conn.cursor()
-            cursor.execute("INSERT INTO ahorros VALUES (?, ?, ?, ?, ?)", (type_saving, name, market, amount,date_saving))
+            cursor.execute(f"SELECT id FROM usuarios WHERE nombre=?",[f"{self.user_current}"])
+            id_user=cursor.fetchone()[0]
+            cursor.execute("INSERT INTO ahorros VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (type_saving, name, market, amount,date_saving,"NULL","NULL", id_user))
             conn.commit()
             conn.close()
 
@@ -183,16 +186,22 @@ class VindowSaving(tk.Toplevel):
 
         self.table_saving.place(x=10,y=45,width=750,height=550)
 
-        # Lee la base de datos
-        f=open("usuario_actual.txt","r",encoding="utf8")
-        user_current=str(f.read())
-        f.close()
-        
-        conn=sqlite3.connect(f'{user_current}.db')
-        
+        ######Llama al usuario
+        conn=sqlite3.connect('main.db')
         cursor=conn.cursor()
-        cursor.execute(f"SELECT tipo, especie, mercado, SUM(cantidad) FROM ahorros GROUP BY especie")
+        cursor.execute(f"SELECT usuarioId FROM usuarioActual")
+        self.userId_current=cursor.fetchone()[0]
+        #Actualiza la base de datos
+        cursor.execute(f"SELECT especie, mercado FROM ahorros WHERE usuarioId={self.userId_current} GROUP BY especie")
+        values_list=cursor.fetchall()
+        cursor=conn.cursor() # Cierro la consulta porque la funcion tambien necesita usar la base de datos para actualizar los precios
+        self.api_bolsar(self.userId_current,values_list) 
+
+        conn=sqlite3.connect('main.db')
+        cursor=conn.cursor()
+        cursor.execute(f"SELECT tipo, especie, mercado, SUM(cantidad), cotizacion FROM ahorros WHERE usuarioId={self.userId_current} GROUP BY especie")
         savings=cursor.fetchall()
+        cursor=conn.cursor()
 
         self.table_saving.delete(*self.table_saving.get_children())
         price_dollar=self.dollar()
@@ -201,9 +210,10 @@ class VindowSaving(tk.Toplevel):
             
             type_saving=saving[0]
             name=saving[1]
-            market=saving[2]
+            # market=saving[2]
             amount=saving[3]
-            price=float(self.api_bolsar(name,market))
+            price=saving[4]
+            # price=float(self.api_bolsar(name,market))
             price_q=amount*price
             price_d=amount*price_dollar
 
@@ -220,22 +230,30 @@ class VindowSaving(tk.Toplevel):
         self.__class__.in_use=True
 
     def dollar(self):
-        r = requests.get("https://api-dolar-argentina.herokuapp.com/api/contadoliqui")
+        # url = "https://api-dolar-argentina.herokuapp.com/api/contadoliqui"
 
-        if r.status_code==200:
-            print("Petición exitosa.")
-            content=r.json()
-            dollar_CCL=float(content["compra"])
-            return dollar_CCL
+        # payload={}
+        # headers = {}
 
-        else:
-            print(r.status_code)
-            dollar_CCL=0
-            return dollar_CCL    
+        # r = requests.request("GET", url, headers=headers, data=payload)  
 
-    def api_bolsar(self,name,market):
-        name=name.upper()
-        name=f"{name}_48hs"
+        # if r.status_code==200:
+        #     print("Petición exitosa.")
+        #     content=r.json()
+        #     print(content)
+        #     print(type(content))
+        #     dollar_CCL=float(content["compra"])
+        #     print(type(dollar_CCL))
+
+        #     return dollar_CCL
+
+        # else:
+        #     print(r.status_code)
+        dollar_CCL=0
+        return dollar_CCL    
+
+    def api_bolsar(self,userId_current,values_list):
+        date_consultation=date.today()
         payload = ""
         headers = {
             "authority": "ws.bolsar.info",
@@ -251,66 +269,191 @@ class VindowSaving(tk.Toplevel):
             "sec-fetch-site": "same-site",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
         }
+        # res=self.check_time()
+        res="yes"
+        if res=="yes":
+            lider=[]
+            panelGeneral=[]
+            cedear=[]
 
-        if market=="Lider":
-            # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
-            # querystring = {"1":"1"}
-            # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+            for value in values_list:
+                if value[1]=="Lider":
+                    lider.append(value[0])
+                elif value[1]=="General":                    
+                    panelGeneral.append(value[0])
+                elif value[1]=="Cedear":
+                    cedear.append(value[0])
+            
+            conn=sqlite3.connect('main.db')
+            cursor=conn.cursor()
 
-            # jsondata=json.loads(response.text)
-            with open('Market.json') as f:
-                jsondata=json.load(f)
+            if lider!=[]:
+                # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
+                # querystring = {"1":"1"}
+                # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+
+                # jsondata=json.loads(response.text)
+                with open('Market.json') as f:
+                    jsondata=json.load(f)
+
+                # creo un diccionario para buscar el código
+                acciones={}
+                codes=jsondata.keys()  #creo una lista con las keys del diccionario
+
+                for code in codes:
+                    value=jsondata[code]["name"]
+                    acciones[value]=code
 
 
-            # creo un diccionario para buscar el código
-            accionesLideres={}
-            codes=jsondata.keys()  #creo una lista con las keys del diccionario
+                for name in lider:
+                    name=name.upper()
+                    name=f"{name}_48hs"
+                    if name in acciones.keys():
+                        code=acciones[name]
+                
+                    datos=jsondata[code]["description"]
+                    datos=datos.strip()
+                    lineas=datos.split("\n") 
 
-            for code in codes:
-                value=jsondata[code]["name"]
-                accionesLideres[value]=code
+                    for linea in lineas:
+                        indice1=linea.find("<b>")
+                        indice2=linea.find("</b>")
+                        price_name=linea[indice1+3:indice2]
+
+                    price_name=price_name.replace(".", "" )
+                    price_name=float(price_name.replace(",", "." ))
+                    name=name.replace("_48hs","")
+                    cursor.execute(f"UPDATE ahorros SET cotizacion=?, cotizacionFecha=? WHERE especie='{name}' AND usuarioId={userId_current} ", (f"{price_name}", f"{date_consultation}"))
+                    conn.commit()
+
+            if panelGeneral!=[]:
+                # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
+                # querystring = {"1":"1"}
+                # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+
+                # jsondata=json.loads(response.text)
+                with open('General.json') as f:
+                    jsondata=json.load(f)
+
+                # creo un diccionario para buscar el código
+                acciones={}
+                codes=jsondata.keys()  #creo una lista con las keys del diccionario
+
+                for code in codes:
+                    value=jsondata[code]["name"]
+                    acciones[value]=code
 
 
-            if name in accionesLideres.keys():
-                code=accionesLideres[name]
+                for name in panelGeneral:
+                    name=name.upper()
+                    name=f"{name}_48hs"
+                    if name in acciones.keys():
+                        code=acciones[name]
+                
+                    datos=jsondata[code]["description"]
+                    datos=datos.strip()
+                    lineas=datos.split("\n") 
+
+                    for linea in lineas:
+                        indice1=linea.find("<b>")
+                        indice2=linea.find("</b>")
+                        price_name=linea[indice1+3:indice2]
+                    
+                    price_name=price_name.replace(".", "" )
+                    price_name=float(price_name.replace(",", "." ))
+                    name=name.replace("_48hs","")
+                    cursor.execute(f"UPDATE ahorros SET cotizacion=?, cotizacionFecha=? WHERE especie='{name}' AND usuarioId={userId_current} ", (f"{price_name}", f"{date_consultation}"))
+                    conn.commit()
+
+            if cedear!=[]:
+                # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
+                # querystring = {"1":"1"}
+                # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+
+                # jsondata=json.loads(response.text)
+                with open('Cedear.json') as f:
+                    jsondata=json.load(f)
+
+                # creo un diccionario para buscar el código
+                acciones={}
+                codes=jsondata.keys()  #creo una lista con las keys del diccionario
+
+                for code in codes:
+                    value=jsondata[code]["name"]
+                    acciones[value]=code
+
+
+                for name in cedear:
+                    name=name.upper()
+                    name=f"{name}_48hs"
+                    if name in acciones.keys():
+                        code=acciones[name]
+                
+                    datos=jsondata[code]["description"]
+                    datos=datos.strip()
+                    lineas=datos.split("\n") 
+
+                    for linea in lineas:
+                        indice1=linea.find("<b>")
+                        indice2=linea.find("</b>")
+                        price_name=linea[indice1+3:indice2]
+                    
+                    price_name=price_name.replace(".", "" )
+                    price_name=float(price_name.replace(",", "." ))
+                    name=name.replace("_48hs","")
+                    cursor.execute(f"UPDATE ahorros SET cotizacion=?, cotizacionFecha=? WHERE especie='{name}' AND usuarioId={userId_current} ", (f"{price_name}", f"{date_consultation}"))
+                    conn.commit()
+
+            # elif name=="Cedear":
+            #     print("cedear")
+            #     # code=cedears[name]
+            #     # url = "https://ws.bolsar.info/BYMA/paneles_v2.php"
+            #     # querystring = {"1":"1","panel":"5","format":"json"}
+            #     # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+
+            #     # jsondata=json.loads(response.text)
+
+            #     # datos=jsondata[code]["description"]
+            #     # datos=datos.strip()
+            #     # lineas=datos.split("\n")
+
+            #     # for linea in lineas:
+            #     #     indice1=linea.find("<b>")
+            #     #     indice2=linea.find("</b>")
+            #     #     price_name=linea[indice1+3:indice2]
+                    
+            #     # return  price_name
 
             else:
                 print("ERROR")
             
-            datos=jsondata[code]["description"]
-            datos=datos.strip()
-            lineas=datos.split("\n") 
+        else:
+            print("ELSE")
 
-            for linea in lineas:
-                indice1=linea.find("<b>")
-                indice2=linea.find("</b>")
-                price_name=linea[indice1+3:indice2]
-            
-            price_name=float(price_name.replace(",", "." ))
-            return  price_name
+        conn.close()
 
-        elif name=="Cedear":
-            print("cedear")
-            # code=cedears[name]
-            # url = "https://ws.bolsar.info/BYMA/paneles_v2.php"
-            # querystring = {"1":"1","panel":"5","format":"json"}
-            # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
-
-            # jsondata=json.loads(response.text)
-
-            # datos=jsondata[code]["description"]
-            # datos=datos.strip()
-            # lineas=datos.split("\n")
-
-            # for linea in lineas:
-            #     indice1=linea.find("<b>")
-            #     indice2=linea.find("</b>")
-            #     price_name=linea[indice1+3:indice2]
-                
-            # return  price_name
+    def check_time(self):
+        #función que verifica la ultima vez que se realizo la consulta, para no exceder la cantidad de peticiones en las páginas que pido la información de la cotización.
+        conn=sqlite3.connect('main.db')
+        cursor=conn.cursor()
+        cursor.execute(f"SELECT cotizacionFecha FROM ahorros")
+        date_price=cursor.fetchone()[0]
+        conn.close()
+        if date_price=="NULL":
+            check="yes"
+            return check
 
         else:
-            print("ERROR")
+            date_current=datetime.now().replace(microsecond=0)
+            minutos_diferencia= (date_current-date_price).total_seconds()/60
+            if minutos_diferencia<60:
+                # "No hace falta volver a pedir la cotización."
+                check="no"
+                return check
+            
+            else:
+                check="yes"
+                return check
 
     def destroy(self):
         self.__class__.in_use=False

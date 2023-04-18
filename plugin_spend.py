@@ -18,7 +18,7 @@ class NewSpend(tk.Toplevel):
         cursor=conn.cursor()
         cursor.execute(f"SELECT nombre FROM usuarioActual")
         self.user_current=cursor.fetchone()[0]
-
+        conn.close()
         ######TIPO
         self.tag_type_movimiento=ttk.Label(
             self,
