@@ -194,8 +194,13 @@ class VindowSaving(tk.Toplevel):
         #Actualiza la base de datos
         cursor.execute(f"SELECT especie, mercado FROM ahorros WHERE usuarioId={self.userId_current} GROUP BY especie")
         values_list=cursor.fetchall()
-        cursor=conn.cursor() # Cierro la consulta porque la funcion tambien necesita usar la base de datos para actualizar los precios
+        cursor=conn.cursor()
         self.api_bolsar(self.userId_current,values_list) 
+        conn.close() # Cierro la consulta porque la funcion tambien necesita usar la base de datos para actualizar los precios
+
+        # Consulto la cotización del dolar
+        price_dollar=self.dollar()
+        #######
 
         conn=sqlite3.connect('main.db')
         cursor=conn.cursor()
@@ -204,20 +209,33 @@ class VindowSaving(tk.Toplevel):
         cursor=conn.cursor()
 
         self.table_saving.delete(*self.table_saving.get_children())
-        price_dollar=self.dollar()
+        
+        price_tq=0
 
         for saving in savings:
             
             type_saving=saving[0]
             name=saving[1]
-            # market=saving[2]
             amount=saving[3]
             price=saving[4]
-            # price=float(self.api_bolsar(name,market))
-            price_q=amount*price
-            price_d=amount*price_dollar
+            price_q=round(amount*price,0)
+            price_d=round(price_q/price_dollar,0)
+            price_tq=price_tq+price_q
 
             self.table_saving.insert("",tk.END,values=(type_saving, name, amount, price,price_q,price_d))
+
+        price_td=round(price_tq/price_dollar,0)
+
+        self.tag_total_pesos=ttk.Label(
+            self,
+            text=f"Total en $ {price_tq}"
+        )
+        self.tag_total_pesos.place(x=20, y=740)
+        self.tag_total_dollar=ttk.Label(
+            self,
+            text=f"Total en USD {price_td}"
+        )
+        self.tag_total_dollar.place(x=20, y=700)
 
         self.btn_close=ttk.Button(
             self,
@@ -230,30 +248,56 @@ class VindowSaving(tk.Toplevel):
         self.__class__.in_use=True
 
     def dollar(self):
-        # url = "https://api-dolar-argentina.herokuapp.com/api/contadoliqui"
+        date_consultation=datetime.now().replace(microsecond=0)
+        userId=0
+        res=self.check_time(userId)
+        if res=="yes":
+            url = "https://www.dolarsi.com/api/api.php"
 
-        # payload={}
-        # headers = {}
+            querystring = {"type":"valoresprincipales"}
 
-        # r = requests.request("GET", url, headers=headers, data=payload)  
+            payload = ""
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Language": "es-ES,es;q=0.9",
+                "Connection": "keep-alive",
+                "Cookie": "_ga=GA1.2.1513822857.1681762964; _gid=GA1.2.79098551.1681762964; _gat=1",
+                "Referer": "https://www.dolarsi.com/func/conversor.php",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
+                "X-Requested-With": "XMLHttpRequest",
+                "sec-ch-ua": "^\^Chromium^^;v=^\^112^^, ^\^Google",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "^\^Windows^^"
+            }
 
-        # if r.status_code==200:
-        #     print("Petición exitosa.")
-        #     content=r.json()
-        #     print(content)
-        #     print(type(content))
-        #     dollar_CCL=float(content["compra"])
-        #     print(type(dollar_CCL))
+            response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
 
-        #     return dollar_CCL
+            jsondata=json.loads(response.text)    
+            
+            price_name=jsondata[4]["casa"]["compra"]
+            price_name=price_name.replace(".", "" )
+            price_name=float(price_name.replace(",", "." ))
+            conn=sqlite3.connect('main.db')
+            cursor=conn.cursor()
+            cursor.execute(f"UPDATE ahorros SET cotizacion=?, cotizacionFecha=? WHERE tipo='Dolar' ", (f"{price_name}", f"{date_consultation}"))
+            conn.commit()
+            conn.close()
 
-        # else:
-        #     print(r.status_code)
-        dollar_CCL=0
-        return dollar_CCL    
+            return price_name
+        
+        else:
+            conn=sqlite3.connect('main.db')
+            cursor=conn.cursor()
+            cursor.execute(f"SELECT cotizacion FROM ahorros WHERE tipo='Dolar'")
+            price_name=cursor.fetchone()[0]
+            conn.close()
+            return price_name
 
     def api_bolsar(self,userId_current,values_list):
-        date_consultation=date.today()
+        date_consultation=datetime.now().replace(microsecond=0)
         payload = ""
         headers = {
             "authority": "ws.bolsar.info",
@@ -269,8 +313,7 @@ class VindowSaving(tk.Toplevel):
             "sec-fetch-site": "same-site",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
         }
-        # res=self.check_time()
-        res="yes"
+        res=self.check_time(userId_current)
         if res=="yes":
             lider=[]
             panelGeneral=[]
@@ -288,13 +331,13 @@ class VindowSaving(tk.Toplevel):
             cursor=conn.cursor()
 
             if lider!=[]:
-                # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
-                # querystring = {"1":"1"}
-                # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+                url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
+                querystring = {"1":"1"}
+                response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
 
-                # jsondata=json.loads(response.text)
-                with open('Market.json') as f:
-                    jsondata=json.load(f)
+                jsondata=json.loads(response.text)
+                # with open('Market.json') as f:
+                #     jsondata=json.load(f)
 
                 # creo un diccionario para buscar el código
                 acciones={}
@@ -327,13 +370,11 @@ class VindowSaving(tk.Toplevel):
                     conn.commit()
 
             if panelGeneral!=[]:
-                # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
-                # querystring = {"1":"1"}
-                # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+                url = "https://ws.bolsar.info/BYMA/paneles_v2.php"
+                querystring = {"1":"1","panel":"2","format":"json"}
+                response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
 
-                # jsondata=json.loads(response.text)
-                with open('General.json') as f:
-                    jsondata=json.load(f)
+                jsondata=json.loads(response.text)
 
                 # creo un diccionario para buscar el código
                 acciones={}
@@ -366,13 +407,11 @@ class VindowSaving(tk.Toplevel):
                     conn.commit()
 
             if cedear!=[]:
-                # url = "https://ws.bolsar.info/BYMA/view/lideres_v2.html"
-                # querystring = {"1":"1"}
-                # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+                url = "https://ws.bolsar.info/BYMA/paneles_v2.php"
+                querystring = {"1":"1","panel":"5","format":"json"}
+                response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
 
-                # jsondata=json.loads(response.text)
-                with open('Cedear.json') as f:
-                    jsondata=json.load(f)
+                jsondata=json.loads(response.text)
 
                 # creo un diccionario para buscar el código
                 acciones={}
@@ -404,51 +443,29 @@ class VindowSaving(tk.Toplevel):
                     cursor.execute(f"UPDATE ahorros SET cotizacion=?, cotizacionFecha=? WHERE especie='{name}' AND usuarioId={userId_current} ", (f"{price_name}", f"{date_consultation}"))
                     conn.commit()
 
-            # elif name=="Cedear":
-            #     print("cedear")
-            #     # code=cedears[name]
-            #     # url = "https://ws.bolsar.info/BYMA/paneles_v2.php"
-            #     # querystring = {"1":"1","panel":"5","format":"json"}
-            #     # response = requests.request("GET", url, data=payload, headers=headers, params=querystring)
+            conn.close()
 
-            #     # jsondata=json.loads(response.text)
-
-            #     # datos=jsondata[code]["description"]
-            #     # datos=datos.strip()
-            #     # lineas=datos.split("\n")
-
-            #     # for linea in lineas:
-            #     #     indice1=linea.find("<b>")
-            #     #     indice2=linea.find("</b>")
-            #     #     price_name=linea[indice1+3:indice2]
-                    
-            #     # return  price_name
-
-            else:
-                print("ERROR")
-            
-        else:
-            print("ELSE")
-
-        conn.close()
-
-    def check_time(self):
+    def check_time(self,userId_current):
         #función que verifica la ultima vez que se realizo la consulta, para no exceder la cantidad de peticiones en las páginas que pido la información de la cotización.
         conn=sqlite3.connect('main.db')
         cursor=conn.cursor()
-        cursor.execute(f"SELECT cotizacionFecha FROM ahorros")
+        cursor.execute(f"SELECT cotizacionFecha FROM ahorros WHERE usuarioId={userId_current}")
         date_price=cursor.fetchone()[0]
         conn.close()
+
         if date_price=="NULL":
             check="yes"
             return check
 
         else:
+            date_price=datetime.strptime(date_price, "%Y-%m-%d %H:%M:%S")
             date_current=datetime.now().replace(microsecond=0)
             minutos_diferencia= (date_current-date_price).total_seconds()/60
+            
             if minutos_diferencia<60:
                 # "No hace falta volver a pedir la cotización."
                 check="no"
+
                 return check
             
             else:

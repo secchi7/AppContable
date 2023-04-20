@@ -146,9 +146,11 @@ class NewUser(tk.Toplevel):
             pass
 
         try:
-            cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fechaCompra DATE, cotizacion FLOAT, cotizacionFecha DATE,usuarioId, FOREIGN KEY(usuarioId) REFERENCES usuarioActual(usuarioId))")
+            cursor.execute("CREATE TABLE ahorros (tipo TEXT, especie TEXT, mercado TEXT, cantidad INT, fechaCompra DATE, cotizacion FLOAT, cotizacionFecha DATE,usuarioId)")
         except sqlite3.OperationalError:
             pass
+
+        cursor.execute("INSERT INTO ahorros VALUES (?, ?, ?, ?, ?, ?, ?, ?)", ("Dolar", "NULL", "NULL", "NULL","NULL","NULL","NULL", 0)) # Creo un primer registro para guardar la cotización del dolar y no tener que crear una tabla extra.
         
         conn.commit()
         conn.close()
